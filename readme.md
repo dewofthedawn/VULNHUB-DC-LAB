@@ -1784,3 +1784,168 @@ chmod +x script.sh
 Sau khi chạy xong thì ta sẽ có quyền root.
 
 ![alt text](IMG/DC-5/image-15.png)
+
+# DC-6
+
+## Recon
+
+Ta thực hiện như các lab trên:
+
+![alt text](IMG/DC-6/image.png)
+
+Giao diện web của WordPress 5.1.1.
+
+![alt text](IMG/DC-6/image-1.png)
+
+Ngoài ra chúng ta còn quét thêm được các user:
+
+![alt text](IMG/DC-6/image-2.png)
+
+## Exploiting WordPress
+
+Ta sẽ sử dụng wpscan đê có thể tấn công mật khẩu từ file rockyou.txt hay password.txt.
+
+```bash
+wpscan --url http://wordy -U user.txt -P ~/passwords.txt -t 60
+```
+
+Quá trình này sẽ mất một chút thời gian.
+
+![alt text](IMG/DC-6/image-3.png)
+
+Sau một thời gian chứng ta thấy chứng ta có được thông tin cửa `mark` là `helpdesk01`. Ta thực hiện login ở trên website
+
+```
+192.168.0.177/wp-login-php
+```
+
+![alt text](IMG/DC-6/image-4.png)
+
+## Reverse Shell
+
+So với lab DC-1 thì ta thấy ở đây bây giờ có thêm `Acticvity Monitor`, chúng ta thử xem có lỗ hổng nào liên quan đến cái này không.
+
+```bash
+searchsploit activity monitor
+```
+
+![alt text](IMG/DC-6/image-5.png)
+
+Như vậy có thể khai thác từ chức năng này, ta thực hiện tải file về và chỉnh sửa sao cho có thể reverse shell sang máy kali của chúng ta.
+
+```bash
+searchsploit -m 45274.html
+```
+
+![alt text](IMG/DC-6/image-6.png)
+
+ta cần chỉnh sửa về trang web của dc-6 và địa chỉ IP của máy chúng ta.
+
+![alt text](IMG/DC-6/image-7.png)
+
+Trên máy kali:
+
+```bash
+nc -lvnp 3333
+```
+
+![alt text](IMG/DC-6/image-8.png)
+
+Ta thực hiện mở file html trên và thực hiện submit request, lúc này tại máy kali cua chúng ta sẽ có một phiên kết nối tới:
+
+![alt text](IMG/DC-6/image-9.png)
+
+## Obtaining SSH Credentials 
+
+Chúng ta thử tìm trong hệ thống:
+
+![alt text](IMG/DC-6/image-10.png)
+
+Chúng ta sẽ thử xem trong mark có gì, vì chúng ta nãy đang login vào tài khoản này:
+
+```bash
+ls -la /home/mark
+```
+
+![alt text](IMG/DC-6/image-11.png)
+
+Tại đây ta thấy có một thư mục `stuff`, bên trong có một file `.txt`:
+
+![alt text](IMG/DC-6/image-12.png)
+
+Tại đây chúng ta có thêm user `graham` và mật khẩu là `GSo7isUM1D4`. Ta thực hiện ssh đến tài khoản này:
+
+```bash
+ssh graham@192.168.0.177
+```
+
+## Hijacking Files 
+
+Chúng ta hãy xem các câu lệnh mà người dùng nay có thê thực thi được dưới quyền sudo:
+
+```bash
+sudo -l
+```
+
+![alt text](IMG/DC-6/image-13.png)
+
+tại đây ta có một file backups.sh để có thể thực thi mà không cần mật khẩu (nhưng đối với jens). Ta hãy xem nội dung của file này:
+
+```bash
+less /home/jens/backups.sh
+```
+
+![alt text](IMG/DC-6/image-14.png)
+
+Chúng ta hãy xem chúng ta có thể có quyền chỉnh sửa file này không:
+
+```bash
+ls -la /home/jens/backups.sh
+```
+
+![alt text](IMG/DC-6/image-15.png)
+
+Như vậy ở đây chúng ta nhận ra chi có những người trong nhóm devs mới có thể chỉnh sửa, vậy chúng ta xem chúng ta có trong nhóm devs hay không:
+
+```bash
+id
+```
+
+![alt text](IMG/DC-6/image-16.png)
+
+Như vậy chúng ta đang đã ở trong nhóm `devs` với tư cách người dùng `graham`
+
+Chúng ta hãy thay đổi nội dung của file:
+
+```bash
+vi /home/jens/backups.sh
+```
+
+![alt text](IMG/DC-6/image-17.png)
+
+```bash
+cd /home/jens
+sudo -u jens ./backups.sh
+```
+
+![alt text](IMG/DC-6/image-18.png)
+
+## Root Flag
+
+ta tiếp tục xem lệnh sudo:
+
+```bash
+sudo -l
+```
+
+![alt text](IMG/DC-6/image-19.png)
+
+Như vậy ở đây ta thấy có lệnh nmap được thực thi dưới quyền root mà không cần mật khẩu. Ta thực hiện tra cứu trên mạng:
+
+![alt text](IMG/DC-6/image-20.png)
+
+![alt text](IMG/DC-6/image-21.png)
+
+![alt text](IMG/DC-6/image-22.png)
+
+![alt text](IMG/DC-6/image-23.png)
